@@ -1,6 +1,6 @@
 photon-pelias-adapter is a small API proxy to replace pelias geocoder with [photon](https://photon.komoot.de).
 We use this to replace pelias with photon in [digitransit-ui](https://github.com/HSLdevcom/digitransit-ui/)
-
+ 
 Supported pelias APIs:
 
 * `/v1/search`
