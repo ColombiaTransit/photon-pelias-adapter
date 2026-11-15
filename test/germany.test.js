@@ -1,9 +1,13 @@
+// Fixtures are German Photon responses: labels there include the postcode.
+const { it } = require("node:test");
 const assert = require("assert");
 const { translateResults } = require("../translate.js");
 
+const DE = { postcode: true };
+
 it("correctly set a label and name for Postbank", function() {
   const input = require("./postbank.json");
-  const result = translateResults(input);
+  const result = translateResults(input, "", DE);
   assert.equal(result.features[0].properties.name, "Postbank");
   assert.equal(result.features[0].properties.label, "Postbank, 45128 Essen");
   assert.equal(result.features[0].properties.layer, "venue");
@@ -14,7 +18,7 @@ it("correctly set a label and name for Postbank", function() {
 
 it("correctly set a label and name for Grundschule", function() {
   const input = require("./grundschule.json");
-  const result = translateResults(input);
+  const result = translateResults(input, "", DE);
   assert.equal(result.features[0].properties.name, "Grundschule");
   assert.equal(result.features[0].properties.label, "Grundschule, Schulstraße, 63933 Mönchberg");
   const names = result.features.map(x => x.properties.name);
@@ -57,7 +61,7 @@ it("correctly set a label and name for Grundschule", function() {
 
 it("correctly set a label and name for Dresdener Straße", function() {
   const input = require("./dresdener-str.json");
-  const result = translateResults(input);
+  const result = translateResults(input, "", DE);
 
   const names = result.features.map(x => x.properties.name);
 
@@ -108,7 +112,7 @@ it("correctly set a label and name for Dresdener Straße", function() {
 
 it("set a label and name for an exact address with house number", function() {
   const input = require("./address-with-housenumber.json");
-  const { features } = translateResults(input);
+  const { features } = translateResults(input, "", DE);
 
   const labels = features.map(x => x.properties.label);
 
@@ -126,7 +130,7 @@ it("set a label and name for an exact address with house number", function() {
 
 it("returns bus_stop in layer stop with ifopt as gtfs id", function() {
   const input = require("./bus-stop.json");
-  const result = translateResults(input, "mydataset");
+  const result = translateResults(input, "mydataset", DE);
   assert.equal(result.features[0].properties.name, "Fanny-Leicht-Straße");
   assert.equal(result.features[0].properties.id, "GTFS:mydataset:de:08111:6012");
   assert.equal(result.features[0].properties.layer, "stop");

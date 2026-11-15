@@ -1,13 +1,18 @@
-FROM node:lts-slim
+FROM node:24-alpine
 
 WORKDIR /usr/src/app
 
-COPY package*.json ./
-RUN npm install
+# No dependencies: Node's built-in http and fetch are enough.
+COPY package.json index.js translate.js ./
 
-COPY . .
+ENV NODE_ENV=production \
+    PORT=8080 \
+    PHOTON_URL=http://photon:2322
 
 EXPOSE 8080
+USER node
 
-CMD [ "node", "index.js" ]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+CMD ["node", "index.js"]
