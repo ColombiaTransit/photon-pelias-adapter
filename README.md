@@ -1,18 +1,41 @@
 photon-pelias-adapter is a small API proxy that answers the Pelias geocoder requests of
-[Digitransit-UI](https://github.com/HSLdevcom/digitransit-ui/) with [Photon](https://github.com/komoot/photon).
+[Digitransit-UI](https://github.com/HSLdevcom/digitransit-ui/) with [Photon](https://github.com/komoot/photon)
+for places and addresses, and with [OpenTripPlanner](https://www.opentripplanner.org/) for public
+transport stops and stations.
 ColombiaTransit uses it for https://colombiatransit.co.
 
 ## Supported Pelias APIs
 
 | Pelias | Photon | Parameters |
 |---|---|---|
-| `/v1/search` | `/api` | `text`, `lang`, `size`, `boundary.rect.*`, `focus.point.*`; `sources`/`layers` only to answer GTFS-only or bike station searches with an empty result |
-| `/v1/reverse` | `/reverse` | `point.lat`, `point.lon`, `lang`, `size`, `boundary.circle.radius` (km) |
-| `/v1/place` | – | always an empty result: Photon cannot look up by id |
-| `/health` | – | 200 for container health checks |
+| Pelias | Backend | Parameters |
+|---|---|---|
+| `/v1/search` | Photon `/api` | `text`, `lang`, `size`, `boundary.rect.*`, `focus.point.*` |
+| `/v1/search` with `sources=gtfs<feed>,…` | OTP stop index | also `layers=stop,station`, `dedupestops=1` |
+| `/v1/reverse` | Photon `/reverse` | `point.lat`, `point.lon`, `lang`, `size`, `boundary.circle.radius` (km) |
+| `/v1/place` | OTP stop index | `ids` with GTFS gids (favourite stops); other ids give an empty result |
+| `/health` | – | 200 for container health checks; with `OTP_URL` also the number of stops loaded |
 
-Not supported: searching GTFS stops and stations (Photon only has OpenStreetMap). For that, a
-full Pelias with the GTFS importer is needed.
+Bike stations (`layers=bikestation`) get an empty result.
+
+### Stops and stations
+
+With `OTP_URL` set, the adapter loads all stops and stations from OTP's GTFS GraphQL API at start
+and every `OTP_REFRESH_MINUTES`; when OTP is unreachable it keeps the last index. Results have the
+format of Pelias' GTFS importer, so Digitransit shows them as stops and opens the stop page:
+`gid = gtfs<feed>:stop:GTFS:<feed>:<id>#<code>`, `layer` stop or station, `addendum.GTFS.modes`.
+
+Matching is made for Colombian stop names:
+
+- accents and punctuation are ignored: `estacion` finds *Estación*;
+- street types are unified: `Cll.`, `Cl`, `Calle` → calle; `Cra.`, `Kr`, `K`, `Carrera` → carrera;
+  also `Av`, `AK`, `AC`, `Tv`, `Dg`, …; `con`, `x` and `-` between streets are ignored;
+- word order does not matter (`carrera 11 calle 72` finds *Cll. 72 - Cra. 11*), and the last word
+  may be unfinished, so search-as-you-type works;
+- exact names rank first, stations above their stops, and nearer stops above far ones when the UI
+  sends a focus point;
+- `dedupestops=1` gives one result per stop: no platforms next to their station and no second
+  stop with the same name within 300 m (the other direction).
 
 Behaviour:
 
@@ -32,6 +55,9 @@ Behaviour:
 | `PHOTON_LANGUAGES` | `default,en,de,fr,it` | languages in the Photon index |
 | `PHOTON_TIMEOUT_MS` | `10000` | timeout per Photon request |
 | `LABEL_POSTCODE` | `false` | show postcodes in labels |
+| `OTP_URL` | – (off) | OTP GTFS GraphQL endpoint, e.g. `http://otp-colombia:8080/otp/gtfs/v1` |
+| `OTP_REFRESH_MINUTES` | `10` | reload interval of the stop index |
+| `FEED_LABELS` | – | area per feed in stop labels, e.g. `bogota=Bogotá,medellin=Medellín`; a stop's GTFS `stop_desc` takes precedence |
 
 ## Run
 
@@ -55,5 +81,13 @@ services:
     restart: unless-stopped
     environment:
       PHOTON_URL: http://photon:2322
-    # same Docker network as the photon container, so the name "photon" resolves
+      OTP_URL: http://otp-colombia:8080/otp/gtfs/v1
+      FEED_LABELS: bogota=Bogotá,medellin=Medellín,cali=Cali,monserrate=Bogotá,chia=Chía
+    networks: [default, traefik]
+    # "photon" resolves on the network of the photon container, "otp-colombia" on traefik_default
+
+networks:
+  traefik:
+    external: true
+    name: traefik_default
 ```

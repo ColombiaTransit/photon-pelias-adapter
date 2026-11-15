@@ -3,7 +3,7 @@ FROM node:24-alpine
 WORKDIR /usr/src/app
 
 # No dependencies: Node's built-in http and fetch are enough.
-COPY package.json index.js translate.js ./
+COPY package.json index.js translate.js stops.js ./
 
 ENV NODE_ENV=production \
     PORT=8080 \
