@@ -21,7 +21,9 @@ Bike stations (`layers=bikestation`) get an empty result.
 ### Stops and stations
 
 With `OTP_URL` set, the adapter loads all stops and stations from OTP's GTFS GraphQL API at start
-and every `OTP_REFRESH_MINUTES`; when OTP is unreachable it keeps the last index. Results have the
+and once a day at `OTP_REFRESH_TIME`, after the nightly graph update; when OTP is unreachable it
+keeps the last index and tries again on a later request. After a graph update at another time,
+restart the adapter to pick up new stops right away. Results have the
 format of Pelias' GTFS importer, so Digitransit shows them as stops and opens the stop page:
 `gid = gtfs<feed>:stop:GTFS:<feed>:<id>#<code>`, `layer` stop or station, `addendum.GTFS.modes`.
 
@@ -56,7 +58,8 @@ Behaviour:
 | `PHOTON_TIMEOUT_MS` | `10000` | timeout per Photon request |
 | `LABEL_POSTCODE` | `false` | show postcodes in labels |
 | `OTP_URL` | – (off) | OTP GTFS GraphQL endpoint, e.g. `http://otp-colombia:8080/otp/gtfs/v1` |
-| `OTP_REFRESH_MINUTES` | `10` | reload interval of the stop index |
+| `OTP_REFRESH_TIME` | `06:00` | daily reload of the stop index; set it after the graph update of OTP (03:15 in otp-docker) has finished |
+| `OTP_TIMEZONE` | `America/Bogota` | time zone of `OTP_REFRESH_TIME` |
 | `FEED_LABELS` | – | area per feed in stop labels, e.g. `bogota=Bogotá,medellin=Medellín`; a stop's GTFS `stop_desc` takes precedence |
 
 ## Run

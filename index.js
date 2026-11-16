@@ -15,7 +15,9 @@
 //   LABEL_POSTCODE       "true" to show postcodes in labels (false)
 //   OTP_URL              OTP GTFS GraphQL endpoint for stop and station search,
 //                        e.g. http://otp-colombia:8080/otp/gtfs/v1 (off when empty)
-//   OTP_REFRESH_MINUTES  how often the stop index is reloaded (10)
+//   OTP_REFRESH_TIME     daily reload of the stop index, after the graph update,
+//                        in OTP_TIMEZONE                    (06:00)
+//   OTP_TIMEZONE         time zone of OTP_REFRESH_TIME      (America/Bogota)
 //   FEED_LABELS          area per feed for stop labels, "bogota=Bogotá,cali=Cali"
 
 const http = require("http");
@@ -35,7 +37,8 @@ const MAX_SIZE = 40;
 
 const stopIndex = new StopIndex({
   otpUrl: process.env.OTP_URL || "",
-  refreshMs: Number(process.env.OTP_REFRESH_MINUTES || 10) * 60 * 1000,
+  refreshTime: process.env.OTP_REFRESH_TIME || "06:00",
+  timeZone: process.env.OTP_TIMEZONE || "America/Bogota",
   feedLabels: parseFeedLabels(process.env.FEED_LABELS),
 });
 const STOP_LAYERS = ["stop", "station"];

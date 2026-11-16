@@ -3,7 +3,7 @@ const { describe, it, before, after } = require("node:test");
 const assert = require("assert");
 const http = require("http");
 
-const { tokenize, queryVariants, StopIndex } = require("../stops.js");
+const { tokenize, queryVariants, msUntilNext, StopIndex } = require("../stops.js");
 
 const OTP_DATA = {
   stations: [
@@ -148,10 +148,31 @@ describe("HTTP server with OTP", () => {
 });
 
 describe("stop index refresh", () => {
+  it("reloads once a day at the configured time in Bogotá", () => {
+    // 2026-11-16 05:30 in Bogotá (UTC-5) = 10:30 UTC
+    const now = new Date("2026-11-16T10:30:00Z");
+    assert.equal(msUntilNext("06:00", "America/Bogota", now), 30 * 60 * 1000);
+    assert.equal(msUntilNext("05:30", "America/Bogota", now), 24 * 3600 * 1000);
+    assert.equal(msUntilNext("05:00", "America/Bogota", now), 23.5 * 3600 * 1000);
+  });
+
+  it("does not reload before the next refresh time", async () => {
+    let loads = 0;
+    const index = new StopIndex({ otpUrl: "http://x/", log: { log() {}, error() {} } });
+    index.load = async () => {
+      loads++;
+      index.entries = [{}];
+      index.nextRefresh = Date.now() + 3600 * 1000;
+    };
+    await index.ensure();
+    await index.ensure();
+    await index.ensure();
+    assert.equal(loads, 1);
+  });
+
   it("keeps the old index when OTP fails", async () => {
     const index = new StopIndex({ otpUrl: "http://127.0.0.1:9/", log: { log() {}, error() {} } });
     index.entries = [{ gtfsId: "x:1" }];
-    index.loadedAt = 0;
     await index.ensure();
     await index.loading;
     assert.equal(index.entries.length, 1);

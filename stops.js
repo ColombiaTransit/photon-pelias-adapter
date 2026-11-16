@@ -4,7 +4,8 @@
 // (sources=gtfs<feed>, layers=stop,station) and refreshes favourite stops with
 // /v1/place?ids=gtfs<feed>:stop:GTFS:<feed>:<id>#<code>. Photon has no GTFS data,
 // so these requests are answered from an in-memory index of all stops and
-// stations, loaded from OTP's GTFS GraphQL API and refreshed periodically.
+// stations, loaded from OTP's GTFS GraphQL API at start and reloaded once a day,
+// after the nightly graph update (OTP_REFRESH_TIME).
 //
 // Matching is made for Colombian names: accents are ignored, street type
 // abbreviations are unified (Cll./Cl./Calle, Cra./Kr./Carrera, ...), word order
@@ -61,6 +62,20 @@ const queryVariants = (s) => {
   return [full, [...tokenize(words.slice(0, -1).join(" ")), last]];
 };
 
+// Milliseconds from `now` until the next "HH:MM" in the given time zone.
+const msUntilNext = (hhmm, timeZone, now = new Date()) => {
+  const [h, m] = String(hhmm).split(":").map(Number);
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
+      .formatToParts(now)
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  const nowSec = parts.hour * 3600 + parts.minute * 60 + parts.second;
+  let delta = (h * 3600 + m * 60 - nowSec + 86400) % 86400;
+  if (delta === 0) delta = 86400;
+  return delta * 1000 - now.getMilliseconds();
+};
+
 const distanceKm = (lat1, lon1, lat2, lon2) => {
   const r = (d) => (d * Math.PI) / 180;
   const h =
@@ -110,15 +125,24 @@ const matchScore = (queryTokens, nameTokens) => {
 };
 
 class StopIndex {
-  constructor({ otpUrl, refreshMs = 10 * 60 * 1000, timeoutMs = 30000, feedLabels = {}, log = console }) {
+  constructor({
+    otpUrl,
+    refreshTime = "06:00",
+    timeZone = "America/Bogota",
+    timeoutMs = 30000,
+    feedLabels = {},
+    log = console,
+  }) {
     this.otpUrl = otpUrl;
-    this.refreshMs = refreshMs;
+    this.refreshTime = refreshTime;
+    this.timeZone = timeZone;
     this.timeoutMs = timeoutMs;
     this.feedLabels = feedLabels;
     this.log = log;
     this.entries = [];
     this.byId = new Map();
     this.loadedAt = 0;
+    this.nextRefresh = 0; // load on first use
     this.lastAttempt = 0;
     this.loading = null;
   }
@@ -151,7 +175,11 @@ class StopIndex {
     this.entries = entries;
     this.byId = new Map(entries.map((e) => [e.gtfsId, e]));
     this.loadedAt = Date.now();
-    this.log.log(`${new Date().toISOString()} stop index: ${entries.length} stops and stations from OTP`);
+    this.nextRefresh = this.loadedAt + msUntilNext(this.refreshTime, this.timeZone);
+    this.log.log(
+      `${new Date().toISOString()} stop index: ${entries.length} stops and stations from OTP, ` +
+        `next reload ${new Date(this.nextRefresh).toISOString()}`,
+    );
   }
 
   entry(s, layer, modes, parent) {
@@ -172,11 +200,12 @@ class StopIndex {
     };
   }
 
-  // Load on first use and refresh in the background; failures keep the old index.
+  // Load on first use and reload once a day in the background. A failed load
+  // keeps the old index and is retried at most once a minute, on the next request.
   async ensure() {
     if (!this.enabled) return;
     const now = Date.now();
-    const stale = now - this.loadedAt > this.refreshMs;
+    const stale = now >= this.nextRefresh;
     const mayRetry = now - this.lastAttempt > 60000;
     if (stale && mayRetry && !this.loading) {
       this.lastAttempt = now;
@@ -261,4 +290,4 @@ class StopIndex {
   }
 }
 
-module.exports = { StopIndex, tokenize, queryVariants, normalizeText, matchScore, parseFeedLabels };
+module.exports = { StopIndex, msUntilNext, tokenize, queryVariants, normalizeText, matchScore, parseFeedLabels };
