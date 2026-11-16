@@ -178,9 +178,19 @@ class StopIndex {
     this.byId = new Map(entries.map((e) => [e.gtfsId, e]));
     this.loadedAt = Date.now();
     this.nextRefresh = this.loadedAt + msUntilNext(this.refreshTime, this.timeZone);
+    const count = (layer) => entries.filter((e) => e.layer === layer).length;
+    const perFeed = {};
+    for (const e of entries) perFeed[e.feed] = (perFeed[e.feed] || 0) + 1;
+    const feeds = Object.entries(perFeed)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([f, n]) => `${f}=${n}`)
+      .join(" ");
+    const skipped = (json.data.stops || []).length + (json.data.stations || []).length - entries.length;
     this.log.log(
-      `${new Date().toISOString()} stop index: ${entries.length} stops and stations from OTP, ` +
-        `next reload ${new Date(this.nextRefresh).toISOString()}`,
+      `${new Date().toISOString()} stop index loaded from OTP: ${count("stop")} stops, ` +
+        `${count("station")} stations` +
+        (skipped ? `, ${skipped} skipped without coordinates` : "") +
+        `; per feed: ${feeds}; next reload ${new Date(this.nextRefresh).toISOString()}`,
     );
   }
 
