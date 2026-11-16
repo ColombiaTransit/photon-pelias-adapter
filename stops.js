@@ -30,6 +30,8 @@ const ABBREVIATIONS = {
   cc: ["centro", "comercial"],
 };
 
+const abbreviation = (t) => (Object.hasOwn(ABBREVIATIONS, t) ? ABBREVIATIONS[t] : null);
+
 // words that only connect parts of a name ("Calle 72 con Carrera 35")
 const CONNECTORS = new Set(["con", "y", "x", "entre", "no", "n", "nro"]);
 
@@ -47,7 +49,7 @@ const tokenize = (s) => {
   const out = [];
   for (const t of normalizeText(s).split(" ")) {
     if (!t || CONNECTORS.has(t)) continue;
-    out.push(...(ABBREVIATIONS[t] || [t]));
+    out.push(...(abbreviation(t) || [t]));
   }
   return out;
 };
@@ -58,7 +60,7 @@ const queryVariants = (s) => {
   const words = normalizeText(s).split(" ").filter((t) => t && !CONNECTORS.has(t));
   const full = tokenize(s);
   const last = words[words.length - 1];
-  if (!last || !ABBREVIATIONS[last]) return [full];
+  if (!last || !abbreviation(last)) return [full];
   return [full, [...tokenize(words.slice(0, -1).join(" ")), last]];
 };
 

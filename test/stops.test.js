@@ -31,6 +31,8 @@ describe("stop name matching", () => {
     assert.deepEqual(tokenize("AK 30 x Cl 45"), ["avenida", "carrera", "30", "calle", "45"]);
     assert.deepEqual(tokenize("Estación San Antonio"), ["estacion", "san", "antonio"]);
     assert.deepEqual(tokenize("Cra5"), ["carrera", "5"]);
+    // words that are also Object properties in JavaScript
+    assert.deepEqual(tokenize("Constructor ToString valueOf __proto__"), ["constructor", "tostring", "valueof", "proto"]);
   });
 
   it("keeps an unfinished abbreviation as a prefix too", () => {
